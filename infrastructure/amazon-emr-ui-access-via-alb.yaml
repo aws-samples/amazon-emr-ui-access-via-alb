@@ -1,0 +1,429 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this
+# software and associated documentation files (the "Software"), to deal in the Software
+# without restriction, including without limitation the rights to use, copy, modify,
+# merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+# PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+Transform: AWS::Serverless-2016-10-31
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Create Application Load Balancer to access EMR Web UIs running on the master node
+  in a private subnet in a VPC. The VPC, private subnets and public subnets are expected
+  to be existing (not created in this template).
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Application Load Balancer Parameters - Environment
+        Parameters:
+          - EnvironmentName
+      - Label:
+          default: Application Load Balancer Parameters - Network
+        Parameters:
+          - VpcID
+          - ElbSubnet1
+          - ElbSubnet2
+          - SSLCertificateArn
+          - ALBIngressCidrBlock
+      - Label:
+          default: Application Load Balancer Parameters - Route 53
+        Parameters:
+          - R53HostedZone
+          - R53WebALBRecordSetName
+      - Label:
+          default: Application Load Balancer Parameters - EMR
+        Parameters:
+          - EMRMasterEC2NodeId
+
+    ParameterLabels:
+      EnvironmentName:
+        default: Select environment for the load balancer (dev, qa, perf, prod, prodmirror, etc.)
+      VpcID:
+        default: Select VPC ID to create ALB in (same VPC where EMR is running)
+      ElbSubnet1:
+        default: Select first public subnet
+      ElbSubnet2:
+        default: Select second public subnet
+      SSLCertificateArn:
+        default: Provide SSL Certificate ARN for the domain used with the ALB
+      ALBIngressCidrBlock:
+        default: Provide Ingress IPV4 CIDR block for Inbound SG rule to restrict ALB access by a range of client IP adresses
+      R53HostedZone:
+        default: Provide R53 Hosted Zone for the domain
+      R53WebALBRecordSetName:
+        default: Provide R53 Alias Recordset name that will front ALB's internal IP address
+      EMRMasterEC2NodeId:
+        default: Provide EMR master node EC2 instance ID
+
+Parameters:
+  ## Required params
+  EnvironmentName:
+    Type: String
+    AllowedValues:
+      - dev
+      - qa
+      - perf
+      - prod
+      - prodmirror
+    Default: dev
+
+  # Network parameters
+  VpcID:
+    Type: AWS::EC2::VPC::Id
+  ElbSubnet1:
+    Type: AWS::EC2::Subnet::Id
+  ElbSubnet2:
+    Type: AWS::EC2::Subnet::Id
+  ALBIngressCidrBlock:
+    Type: String
+
+  # Route 53 DNS Parameters
+  R53HostedZone:
+    Type: String
+    Default: example.com
+  SSLCertificateArn:
+    Type: String
+  R53WebALBRecordSetName:
+    Type: String
+
+  # EMR Parameters
+  EMRMasterEC2NodeId:
+    Type: String
+    Default: ''
+
+Conditions:
+  HasR53HostedZone: !Not [!Equals ['', !Ref R53HostedZone]]
+  HasRecordsetName: !Not [!Equals ['', !Ref R53WebALBRecordSetName]]
+  CreateALBR53Recordset: !And [!Condition HasR53HostedZone, !Condition HasRecordsetName]
+
+  SetEMRMasterNodeId: !Not [!Equals ['', !Ref EMRMasterEC2NodeId]]
+
+Resources:
+  # EMR ALB Resources
+  # ALB, Target Groups, Listeners and R53 RecordSet
+  SampleEmrApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Name: sample-emr-alb
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref AlbIngressSecurityGroup
+
+      Subnets:
+        - !Ref ElbSubnet1
+        - !Ref ElbSubnet2
+      LoadBalancerAttributes:
+        -
+          Key: deletion_protection.enabled
+          Value: false
+      Tags:
+        -
+          Key: businessunit
+          Value: heloc
+        -
+          Key: environment
+          Value: !Ref EnvironmentName
+        -
+          Key: name
+          Value: sample-emr-alb
+
+  ALBHttpGangliaTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 5
+      HealthCheckPath: '/ganglia'
+      Matcher:
+        HttpCode: 200-399
+      Name: sample-emr-ganglia-tgt
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VpcID
+      TargetType: instance
+      # Register InstanceIds as target outside of CN template
+      Targets:
+       - Id: !Ref EMRMasterEC2NodeId
+         Port: 80
+      Tags:
+        -
+          Key: Name
+          Value: sample-emr-ganglia-tgt
+        -
+          Key: LoadBalancer
+          Value: !Ref SampleEmrApplicationLoadBalancer
+
+  ALBHttpGangliaListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBHttpGangliaTargetGroup
+      LoadBalancerArn: !Ref SampleEmrApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # YARN Resource Manager Target Group
+  ALBHttpYarnResourceManagerTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 5
+      Matcher:
+        HttpCode: 200-399
+      Name: sample-emr-yarn-rm-tgt
+      Port: 8088
+      Protocol: HTTP
+      VpcId: !Ref VpcID
+      TargetType: instance
+      Targets:
+       - Id: !Ref EMRMasterEC2NodeId
+         Port: 8088
+      Tags:
+        -
+          Key: Name
+          Value: sample-emr-yarn-rm-tgt
+        -
+          Key: LoadBalancer
+          Value: !Ref SampleEmrApplicationLoadBalancer
+  # YARN Resource Manager Listener
+  ALBHttpYarnResourceManagerListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBHttpYarnResourceManagerTargetGroup
+      LoadBalancerArn: !Ref SampleEmrApplicationLoadBalancer
+      Port: 8088
+      Protocol: HTTP
+
+  # Livy Target Group
+  ALBHttpLivyTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 5
+      Matcher:
+        HttpCode: 200-399
+      Name: sample-emr-livy-tgt
+      Port: 8998
+      Protocol: HTTP
+      VpcId: !Ref VpcID
+      TargetType: instance
+      Targets:
+       - Id: !Ref EMRMasterEC2NodeId
+         Port: 8998
+      Tags:
+        -
+          Key: Name
+          Value: sample-emr-livy-tgt
+        -
+          Key: LoadBalancer
+          Value: !Ref SampleEmrApplicationLoadBalancer
+  # Livy Listener
+  ALBHttpLivyListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBHttpLivyTargetGroup
+      LoadBalancerArn: !Ref SampleEmrApplicationLoadBalancer
+      Port: 8998
+      Protocol: HTTP
+
+  # Jupyter Target Group
+  ALBHttpJupyterTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 5
+      Matcher:
+        HttpCode: 200-399
+      Name: sample-emr-jupyter-tgt
+      Port: 9443
+      Protocol: HTTPS
+      VpcId: !Ref VpcID
+      TargetType: instance
+      Targets:
+       - Id: !Ref EMRMasterEC2NodeId
+         Port: 9443
+      Tags:
+        -
+          Key: Name
+          Value: sample-emr-jupyter-tgt
+        -
+          Key: LoadBalancer
+          Value: !Ref SampleEmrApplicationLoadBalancer
+
+  # Jupyter Listener
+  ALBHttpJupyterListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBHttpJupyterTargetGroup
+      LoadBalancerArn: !Ref SampleEmrApplicationLoadBalancer
+      Certificates:
+        - CertificateArn: !Ref SSLCertificateArn
+      Port: 9443
+      Protocol: HTTPS
+
+
+  #Tez Target Group
+  ALBHttpTezTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 5
+      HealthCheckPath: '/tez-ui'
+      Matcher:
+        HttpCode: 200-399
+      Name: sample-emr-tez-tgt
+      Port: 8080
+      Protocol: HTTP
+      VpcId: !Ref VpcID
+      TargetType: instance
+      Targets:
+       - Id: !Ref EMRMasterEC2NodeId
+         Port: 8080
+      Tags:
+        -
+          Key: Name
+          Value: sample-emr-tez-tgt
+        -
+          Key: LoadBalancer
+          Value: !Ref SampleEmrApplicationLoadBalancer
+
+  # Tez listener
+  ALBHttpTezListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBHttpTezTargetGroup
+      LoadBalancerArn: !Ref SampleEmrApplicationLoadBalancer
+      Port: 8080
+      Protocol: HTTP
+
+  #Hue Target Group
+  ALBHttpHueTargetGroup:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 5
+      Matcher:
+        HttpCode: 200-399
+      Name: sample-emr-hue-tgt
+      Port: 8888
+      Protocol: HTTP
+      VpcId: !Ref VpcID
+      TargetType: instance
+      Targets:
+       - Id: !Ref EMRMasterEC2NodeId
+         Port: 8888
+      Tags:
+        -
+          Key: Name
+          Value: sample-emr-hue-tgt
+        -
+          Key: LoadBalancer
+          Value: !Ref SampleEmrApplicationLoadBalancer
+
+  #Hue ALB listener
+  ALBHttpHueListener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBHttpHueTargetGroup
+      LoadBalancerArn: !Ref SampleEmrApplicationLoadBalancer
+      Port: 8888
+      Protocol: HTTP
+
+
+  Route53HeadlessEMRWebALBRecordset:
+    Type: AWS::Route53::RecordSet
+    Condition: CreateALBR53Recordset
+    DependsOn: SampleEmrApplicationLoadBalancer
+    Properties:
+      Comment: DNS Entry for Headless EMR Web Interfaces ALB
+      HostedZoneName: !Join ['', [!Ref 'R53HostedZone', '.']]
+      Name: !Join ['', [!Ref 'R53WebALBRecordSetName','.', !Ref 'R53HostedZone', '.']]
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt SampleEmrApplicationLoadBalancer.DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId: !GetAtt SampleEmrApplicationLoadBalancer.CanonicalHostedZoneID
+
+  AlbIngressSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Control access to the ALB
+      VpcId: !Ref VpcID
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: !Ref ALBIngressCidrBlock # ALB access limited IP addresses in this CIDR block. Should be used to restrict traffic from your corporate network, or VPCs.
+
+Outputs:
+
+  #ALB Resources ARNs
+  SampleEmrApplicationLoadBalancerARN:
+    Value: !Ref SampleEmrApplicationLoadBalancer
+    Description: Headless EMR Web Interfaces ALB ARN
+
+  ALBHttpGangliaTargetGroupARN:
+    Value: !Ref ALBHttpGangliaTargetGroup
+    Description: Load balancer target group for Ganglia web interface
+
+  ALBHttpGangliaListenerARN:
+    Value: !Ref ALBHttpGangliaListener
+    Description: Load balancer listener for Ganglia web interface
+
+  ALBHttpYarnResourceManagerTargetGroupARN:
+    Value: !Ref ALBHttpYarnResourceManagerTargetGroup
+    Description: Load balancer target group for YARN Resource Manager web interface
+
+  ALBHttpYarnResourceManagerListenerARN:
+    Value: !Ref ALBHttpYarnResourceManagerListener
+    Description: Load balancer listener for YARN Resource Manager web interface
+
+  ALBHttpLivyTargetGroupARN:
+    Value: !Ref ALBHttpLivyTargetGroup
+    Description: Load balancer target group for Livy web interface
+
+  ALBHttpLivyListenerARN:
+    Value: !Ref ALBHttpLivyListener
+    Description: Load balancer listener for Livy web interface
+
+  ALBHttpJupyterTargetGroupARN:
+    Value: !Ref ALBHttpJupyterTargetGroup
+    Description: Load balancer target group for Jupyter hub web interface
+
+  ALBHttpJupyterListenerARN:
+    Value: !Ref ALBHttpJupyterListener
+    Description: Load balancer listener for Jupyter hub web interface
