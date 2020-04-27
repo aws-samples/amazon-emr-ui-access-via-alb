@@ -27,8 +27,8 @@ The solution outlined in this post restricts access to EMR web interfaces for a 
 
 Please see below the sequence of steps executed when the EMR web instance is accessed by a client through Route 53 and ALB.
 
-  * •	Client submits web interface request from a web browser, e.g. YARN Node Manager - http://sample-emr-web.example.com:8088/cluster
-  *	•	The HTTP request will be resolved by Route 53 using the record set name “sample-emr-web” in the hosted zone “example.com.” for the registered domain “example.com”. Route 53 will resolve the request URL to the IP address of ALB in the public subnet, and route request to the ALB.
+  * Client submits web interface request from a web browser, e.g. YARN Node Manager - http://sample-emr-web.example.com:8088/cluster
+  *	The HTTP request will be resolved by Route 53 using the record set name “sample-emr-web” in the hosted zone “example.com.” for the registered domain “example.com”. Route 53 will resolve the request URL to the IP address of ALB in the public subnet, and route request to the ALB.
   *	The ALB receives the EMR web interface request on its HTTP listener and forwards it to the web interface endpoint configured in the load balancer target group. There are multiple HTTP listener and load balancer target group pairs created, one for each EMR web interface endpoint.
   *	The ALB Ingress Security Group controls what other VPCs and/or corporate networks can access the ALB
   *	The EMR Ingress Security Group on the master node allows inbound traffic from the ALB to the EMR
