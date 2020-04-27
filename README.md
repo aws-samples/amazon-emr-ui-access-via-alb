@@ -3,48 +3,49 @@
 EMR web interfaces are hosted on the master node of EMR cluster. When you launch an Amazon EMR cluster in a private subnet, the EMR master node doesn’t have a public DNS record. The web interfaces for the EMR hosted in a private subnet are not easily accessible outside the subnet. An Application Load Balancer (ALB) launched in a public subnet can be used as a HTTP proxy to access EMR web interfaces over the internet, without requiring SSH tunneling through a bastion host. This approach greatly simplifies accessing EMR web interfaces for data scientists and data engineers.
 This post outlines the solution using an ALB to securely access EMR web interfaces over the internet for an EMR cluster launched in a private subnet.
 
-|Time to read	                | 5 minutes     |
-|Time to complete             | 30 minutes    |
-|Cost to complete (estimated) |	$.50          |
-|Learning level               |	Advanced (300)|
+|-----------------------------|---------------------------|
+|Time to read	                | 5 minutes                 |
+|Time to complete             | 30 minutes                |
+|Cost to complete (estimated) |	$.50                      |
+|Learning level               |	Advanced (300)            |
 |Services used                | Application Load Balancer |
-|                             |  Route 53 |
-|                             |   Amazon EMR |
-|                             |   AWS Certificate Manager|
+|                             |  Route 53                 |
+|                             |   Amazon EMR              |
+|                             |   AWS Certificate Manager |
 
-# Overview of solution
+## Overview of solution
 Nodes that are launched within a VPC subnet cannot communicate outside of the subnet unless there is a network route from the subnet to other subnets in its VPC, or other VPCs using VPC Pairing, or having a route from AWS Direct Connect to the subnet, having a route to an internet gateway or having a route to from a VPN connection to the subnet. For customers who want the highest level of security to an EMR cluster, they choose to place the cluster into a subnet with minimal number of routes to the cluster. This makes it more difficult to access web interfaces running on the master node of a EMR cluster that is launched in a private subnet. In this solution, we use an ALB hosted in a public subnet that act as an HTTP proxy to web interface endpoints on the EMR master node. The ALB listens on HTTP(s) ports for incoming web interface access requests, and routes requests to the configured ALB targets those point to the web interface endpoints on the EMR master node.
 The diagram below shows the network flow from client through Route 53 and the ALB to EMR master node to access web interfaces running on the master node in a private subnet.
 
 ![](images/emr-web-interfaces-via-alb-architecture.png)
 
-# Securing your endpoints
+## Securing your endpoints
 The solution outlined in this post restricts access to EMR web interfaces to a range of client IP addresses using an ingress security group on ALB. The endpoints those are reachable using ALB should be further secured by having a user authentication mechanism like LDAP, SSO, etc. Jupyter authentication methods are found at - [Adding Jupyter Notebook Users and Administrators](https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-jupyterhub-user-access.html), Hue is found at: [Configure Hue for LDAP Users](https://docs.aws.amazon.com/emr/latest/ReleaseGuide/hue-ldap.html), Hive is found at - [LDAP Authentication for Hive](https://cwiki.apache.org/confluence/display/Hive/User+and+Group+Filter+Support+with+LDAP+Atn+Provider+in+HiveServer2). It may be a good idea as well to enable access logs through the ALB. Please refer to ‘[Access Logs for Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html)’ for more details on ALB access logs.
 
 Please see below the sequence of steps executed when the EMR web instance is accessed by a client through Route 53 and ALB.
 
-•	Client submits web interface request from a web browser, e.g. – YARN Node Manager - http://sample-emr-web.example.com:8088/cluster
-•	The HTTP request will be resolved by Route 53 using the record set name ‘sample-emr-web’ in the hosted zone ‘example.com.’ for the registered domain ‘example.com’. Route 53 will resolve request URL to the IP address of ALB in the public subnet, and route request to the ALB.
-•	The ALB receives the EMR web interface request on its HTTP listener, and forwards it to the web interface endpoint configured in the load balancer target group. There are multiple HTTP listener and load balancer target group pairs created, one for each EMR web interface endpoint.
-•	ALB Ingress Security Group controls what other VPCs and/or corporate networks can access the ALB
-•	The EMR Ingress Security Group on the master node allows inbound traffic to EMR from the ALB
+Markup: * Client submits web interface request from a web browser, e.g. – YARN Node Manager - http://sample-emr-web.example.com:8088/cluster
+        *	The HTTP request will be resolved by Route 53 using the record set name ‘sample-emr-web’ in the hosted zone ‘example.com.’ for the registered domain ‘example.com’. Route 53 will resolve request URL to the IP address of ALB in the public subnet, and route request to the ALB.
+        *	The ALB receives the EMR web interface request on its HTTP listener, and forwards it to the web interface endpoint configured in the load balancer target group. There are multiple HTTP listener and load balancer target group pairs created, one for each EMR web interface endpoint.
+        *	ALB Ingress Security Group controls what other VPCs and/or corporate networks can access the ALB
+        *	The EMR Ingress Security Group on the master node allows inbound traffic to EMR from the ALB
 
 The CloudFormation template for the solution creates following AWS objects in the solution stack:
-•	ALB
-•	HTTP Listener and target pairs, one pair for each EMR web application. It supports Ganglia, YARN Resource Manager, JupyterHub, Livy and Hue EMR web applications. You can modify CloudFormation stack to add ALB HTTP listeners and targets for any other EMR web applications.
-•	It creates AWS::Route53::RecordSet in the hosted zone for a given registered domain, e.g. recordset name - ‘sample-emr-web’, hosted zone – ‘example.com.’ for the domain ‘example.com’. The hosted-zone and recordset name are parameters on CloudFormation template.
-•	An Ingress Security Group attached to the ALB that controls what CIDR blocks can access the ALB. You can modify template to customize Ingress SG to meet your requirements.
+Markup: *	ALB
+        *	HTTP Listener and target pairs, one pair for each EMR web application. It supports Ganglia, YARN Resource Manager, JupyterHub, Livy and Hue EMR web applications. You can modify CloudFormation stack to add ALB HTTP listeners and targets for any other EMR web applications.
+        *	It creates AWS::Route53::RecordSet in the hosted zone for a given registered domain, e.g. recordset name - ‘sample-emr-web’, hosted zone – ‘example.com.’ for the domain ‘example.com’. The hosted-zone and recordset name are parameters on CloudFormation template.
+        *	An Ingress Security Group attached to the ALB that controls what CIDR blocks can access the ALB. You can modify template to customize Ingress SG to meet your requirements.
 
-# Prerequisites
+## Prerequisites
 For this walkthrough, you should have the following prerequisites:
-•	An [AWS account](https://signin.aws.amazon.com/signin?redirect_uri=https%3A%2F%2Fportal.aws.amazon.com%2Fbilling%2Fsignup%2Fresume&client_id=signup)
-•	VPC with private and public subnets. ALB requires at least two availability zones (AZ), with one public subnet in each AZ. Please refer to [basic-vpc-example](https://github.com/kennyk65/aws-vpc-cloud-formation/blob/master/base-vpc-example.template.yml) for sample code to create a basic VPC with private and public subnets.
-•	EMR instance launched in a private subnet
-•	Web applications - Ganglia, Livy, Jupyter and Hue should be installed on the EMR cluster when the cluster is launched
-•	Create a Hosted Zone entry in Route 53 for your domain
+*	An [AWS account](https://signin.aws.amazon.com/signin?redirect_uri=https%3A%2F%2Fportal.aws.amazon.com%2Fbilling%2Fsignup%2Fresume&client_id=signup)
+*	VPC with private and public subnets. ALB requires at least two availability zones (AZ), with one public subnet in each AZ. Please refer to [basic-vpc-example](https://github.com/kennyk65/aws-vpc-cloud-formation/blob/master/base-vpc-example.template.yml) for sample code to create a basic VPC with private and public subnets.
+*	EMR instance launched in a private subnet
+*	Web applications - Ganglia, Livy, Jupyter and Hue should be installed on the EMR cluster when the cluster is launched
+*	Create a Hosted Zone entry in Route 53 for your domain
 
 Note: You will need to register a new domain, if you don’t have a domain. You can register a new domain in Route 53. There is a non-refundable cost associated with registering a new domain. Please review [Amazon Route 53 Pricing for Domain Registration](https://aws.amazon.com/route53/pricing/).
-•	A public certificate is required to access HTTPS endpoints in the domain. If you don’t have a public certificate, please create a new certificate. Please refer to [Requesting a Public Certificate](https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-request-public.html).
+*	A public certificate is required to access HTTPS endpoints in the domain. If you don’t have a public certificate, please create a new certificate. Please refer to [Requesting a Public Certificate](https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-request-public.html).
 
 To create ALB as an HTTP proxy in front of EMR, please follow steps below to create CloudFormation stack.
 1.	Log in to [AWS account](https://signin.aws.amazon.com/signin?redirect_uri=https%3A%2F%2Fportal.aws.amazon.com%2Fbilling%2Fsignup%2Fresume&client_id=signup)
@@ -97,10 +98,10 @@ The cost explorer table below shows sample total cost and cost breakup by servic
 
 ![](images/cost-to-run-breakup.png)
 
-# Cleaning up
+## Cleaning up
 To avoid incurring future charges, delete CloudFormation stack to delete all the resources created.
 
-# Conclusion
+## Conclusion
 You can now create an Application Load Balance as a HTTP proxy to access EMR web interfaces securely over the internet, without requiring bastion host for SSH tunneling. This simplifies securely accessing EMR web interfaces for the EMR launched in a private subnet.
 
 ## License
