@@ -94,11 +94,11 @@ In the following steps, you add an inbound rule to the security group.
   ![](images/emr-master-sg-ingressrule-save.png)
 
   14.	Test the following EMR web interfaces in your browser:
-    a.	Ganglia – http://sample-emr-web.[web domain]/ganglia/
-    b.	YARN Resource Manager – http://sample-emr-web. [web domain]:8088/cluster
-    c.	JupyterHub – https://sample-emr-web. [web domain]:9443/hub/login
-    d.	Hue – http://sample-emr-web. [web domain]:8888/hue/accounts/login
-    e.	Livy – http://sample-emr-web. [web domain]:8998/ui
+    a.    Ganglia – http://sample-emr-web.[web domain]/ganglia/
+    b.	   YARN Resource Manager – http://sample-emr-web. [web domain]:8088/cluster
+    c.	   JupyterHub – https://sample-emr-web. [web domain]:9443/hub/login
+    d.	   Hue – http://sample-emr-web. [web domain]:8888/hue/accounts/login
+    e.	   Livy – http://sample-emr-web. [web domain]:8998/ui
 
 
   If you can access the Ganglia web interface on port 80 but don’t get a response from other web interface endpoints listening on other ports, disconnect from your VPN connection and test it. Some organizations may block outgoing web requests on ports other than 80.
