@@ -18,11 +18,11 @@ This post outlines how to use an ALB to securely access EMR web interfaces over 
 ## Overview of solution
 Nodes that are launched within a VPC subnet can’t communicate outside of the subnet unless one of the following exists:
 
-•	A network route from the subnet to other subnets in its VPC
-•	Subnets in other VPCs using VPC Peering
-•	A route through AWS Direct Connect to the subnet
-•	A route to an internet gateway
-•	A route to the subnet from a VPN connection
+* A network route from the subnet to other subnets in its VPC
+* Subnets in other VPCs using VPC Peering
+* A route through AWS Direct Connect to the subnet
+* A route to an internet gateway
+* A route to the subnet from a VPN connection
 
 If you want the highest level of security to an EMR cluster, you should place the cluster in a subnet with a minimal number of routes to the cluster. This makes it more difficult to access web interfaces running on the master node of an EMR cluster launched in a private subnet. 
 
