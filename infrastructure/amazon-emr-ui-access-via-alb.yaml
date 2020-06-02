@@ -384,7 +384,7 @@ Resources:
       - IpProtocol: tcp
         FromPort: 0
         ToPort: 65535
-        CidrIp: !Ref ALBIngressCidrBlock # ALB access limited IP addresses in this CIDR block. Should be used to restrict traffic from your corporate network, or VPCs.
+        CidrIp: !Ref ALBIngressCidrBlock # ALB access limited to IP addresses in this CIDR block. Should be used to restrict traffic from your corporate network, or VPCs.
 
 Outputs:
 
