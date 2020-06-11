@@ -171,8 +171,10 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref ALBHttpGangliaTargetGroup
       LoadBalancerArn: !Ref SampleEmrApplicationLoadBalancer
-      Port: 80
-      Protocol: HTTP
+      Certificates:
+        - CertificateArn: !Ref SSLCertificateArn
+      Port: 443
+      Protocol: HTTPS
 
   # YARN Resource Manager Target Group
   ALBHttpYarnResourceManagerTargetGroup:
@@ -207,8 +209,10 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref ALBHttpYarnResourceManagerTargetGroup
       LoadBalancerArn: !Ref SampleEmrApplicationLoadBalancer
+      Certificates:
+        - CertificateArn: !Ref SSLCertificateArn
       Port: 8088
-      Protocol: HTTP
+      Protocol: HTTPS
 
   # Livy Target Group
   ALBHttpLivyTargetGroup:
@@ -243,8 +247,10 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref ALBHttpLivyTargetGroup
       LoadBalancerArn: !Ref SampleEmrApplicationLoadBalancer
+      Certificates:
+        - CertificateArn: !Ref SSLCertificateArn
       Port: 8998
-      Protocol: HTTP
+      Protocol: HTTPS
 
   # Jupyter Target Group
   ALBHttpJupyterTargetGroup:
@@ -321,8 +327,10 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref ALBHttpTezTargetGroup
       LoadBalancerArn: !Ref SampleEmrApplicationLoadBalancer
+      Certificates:
+        - CertificateArn: !Ref SSLCertificateArn
       Port: 8080
-      Protocol: HTTP
+      Protocol: HTTPS
 
   #Hue Target Group
   ALBHttpHueTargetGroup:
@@ -358,8 +366,10 @@ Resources:
         - Type: forward
           TargetGroupArn: !Ref ALBHttpHueTargetGroup
       LoadBalancerArn: !Ref SampleEmrApplicationLoadBalancer
+      Certificates:
+        - CertificateArn: !Ref SSLCertificateArn
       Port: 8888
-      Protocol: HTTP
+      Protocol: HTTPS
 
 
   Route53HeadlessEMRWebALBRecordset:
