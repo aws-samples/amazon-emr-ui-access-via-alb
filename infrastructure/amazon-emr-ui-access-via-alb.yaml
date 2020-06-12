@@ -164,7 +164,7 @@ Resources:
           Key: LoadBalancer
           Value: !Ref SampleEmrApplicationLoadBalancer
 
-  ALBHttpGangliaListener:
+  ALBHttpsGangliaListener:
     Type: 'AWS::ElasticLoadBalancingV2::Listener'
     Properties:
       DefaultActions:
@@ -202,7 +202,7 @@ Resources:
           Key: LoadBalancer
           Value: !Ref SampleEmrApplicationLoadBalancer
   # YARN Resource Manager Listener
-  ALBHttpYarnResourceManagerListener:
+  ALBHttpsYarnResourceManagerListener:
     Type: 'AWS::ElasticLoadBalancingV2::Listener'
     Properties:
       DefaultActions:
@@ -240,7 +240,7 @@ Resources:
           Key: LoadBalancer
           Value: !Ref SampleEmrApplicationLoadBalancer
   # Livy Listener
-  ALBHttpLivyListener:
+  ALBHttpsLivyListener:
     Type: 'AWS::ElasticLoadBalancingV2::Listener'
     Properties:
       DefaultActions:
@@ -279,7 +279,7 @@ Resources:
           Value: !Ref SampleEmrApplicationLoadBalancer
 
   # Jupyter Listener
-  ALBHttpJupyterListener:
+  ALBHttpsJupyterListener:
     Type: 'AWS::ElasticLoadBalancingV2::Listener'
     Properties:
       DefaultActions:
@@ -320,7 +320,7 @@ Resources:
           Value: !Ref SampleEmrApplicationLoadBalancer
 
   # Tez listener
-  ALBHttpTezListener:
+  ALBHttpsTezListener:
     Type: 'AWS::ElasticLoadBalancingV2::Listener'
     Properties:
       DefaultActions:
@@ -359,7 +359,7 @@ Resources:
           Value: !Ref SampleEmrApplicationLoadBalancer
 
   #Hue ALB listener
-  ALBHttpHueListener:
+  ALBHttpsHueListener:
     Type: 'AWS::ElasticLoadBalancingV2::Listener'
     Properties:
       DefaultActions:
@@ -407,30 +407,38 @@ Outputs:
     Value: !Ref ALBHttpGangliaTargetGroup
     Description: Load balancer target group for Ganglia web interface
 
-  ALBHttpGangliaListenerARN:
-    Value: !Ref ALBHttpGangliaListener
+  ALBHttpsGangliaListenerARN:
+    Value: !Ref ALBHttpsGangliaListener
     Description: Load balancer listener for Ganglia web interface
 
   ALBHttpYarnResourceManagerTargetGroupARN:
     Value: !Ref ALBHttpYarnResourceManagerTargetGroup
     Description: Load balancer target group for YARN Resource Manager web interface
 
-  ALBHttpYarnResourceManagerListenerARN:
-    Value: !Ref ALBHttpYarnResourceManagerListener
+  ALBHttpsYarnResourceManagerListenerARN:
+    Value: !Ref ALBHttpsYarnResourceManagerListener
     Description: Load balancer listener for YARN Resource Manager web interface
 
   ALBHttpLivyTargetGroupARN:
     Value: !Ref ALBHttpLivyTargetGroup
     Description: Load balancer target group for Livy web interface
 
-  ALBHttpLivyListenerARN:
-    Value: !Ref ALBHttpLivyListener
+  ALBHttpsLivyListenerARN:
+    Value: !Ref ALBHttpsLivyListener
     Description: Load balancer listener for Livy web interface
 
   ALBHttpJupyterTargetGroupARN:
     Value: !Ref ALBHttpJupyterTargetGroup
     Description: Load balancer target group for Jupyter hub web interface
 
-  ALBHttpJupyterListenerARN:
-    Value: !Ref ALBHttpJupyterListener
+  ALBHttpsJupyterListenerARN:
+    Value: !Ref ALBHttpsJupyterListener
     Description: Load balancer listener for Jupyter hub web interface
+
+  ALBHttpHueTargetGroupARN:
+    Value: !Ref ALBHttpHueTargetGroup
+    Description: Load balancer target group for Jupyter hub web interface
+
+  ALBHttpsHueListenerARN:
+    Value: !Ref ALBHttpsHueListener
+    Description: Load balancer listener for Hue web interface
