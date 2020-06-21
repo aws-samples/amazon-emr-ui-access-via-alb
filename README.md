@@ -169,18 +169,18 @@ In the following steps, you add an inbound rule to the security group.
   You can add code to support other EMR web interface endpoints in the CloudFormation template. For more information, see [View Web Interfaces Hosted on Amazon EMR Clusters](https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-web-interfaces.html).
 
 
-## Locating the public certificate ARN from AWS Certificate Manager
+### Locating the public certificate ARN from AWS Certificate Manager
 You can find the public certificate ARN from [AWS Certificate Manager (ACM)](http://aws.amazon.com/acm) on the ACM console. When you expand the domain for a given certificate, locate the ARN in the **Details** section.
 ![](images/howtoget-certificate-arn.png)
 
-## Creating a hosted zone from Route 53
-To create a hosted zone from Route 53, complete the following steps:
+### Getting a hosted zone domain name from Route 53
+To get a hosted zone domain name from Route 53, complete the following steps:
 
  1.	On the Route 53 console, choose Hosted zones.
  2.	Choose the hosted zone in your domain.
  3.	In the Hosted Zone Details section, copy the entry for Domain Name.
 ![](images/howtoget-r53-hostedzone-name.png)
-
+ 4. Enter the domain name in the R53 Hosted Zone AWS CloudFormation parameter box
 ## Cost breakup:
 The cost explorer table below shows sample total cost and cost breakup by services for the time it takes to complete exercise in this blog. This cost includes cost for a minimal EMR cluster without any data stored created at the start of the exercise, and the resources created by the CloudFormation template.
 
