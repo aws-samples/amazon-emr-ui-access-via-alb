@@ -1,6 +1,5 @@
 ## Accessing web interfaces securely on Amazon EMR launched in a private subnet using an Application Load Balancer
 Hitesh Parikh, Cloud Architect, AWS Professional Services
-
 James Sun, Senior Solutions Architect, AWS
 
 [Amazon EMR](http://aws.amazon.com/emr) web interfaces are hosted on the master node of an EMR cluster. When you launch an EMR cluster in a private subnet, the EMR master node doesn’t have a public DNS record. The web interfaces hosted in a private subnet aren’t easily accessible outside the subnet. You can use an Application Load Balancer (ALB) as an HTTPS proxy to access EMR web interfaces over the internet without requiring SSH tunneling through a bastion host. This approach greatly simplifies accessing EMR web interfaces.
